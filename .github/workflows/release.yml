@@ -1,0 +1,28 @@
+# Turns a push to the "incoming" branch into the newest release.
+# The publish workflow in benjabts/companion pushes there with a write deploy key
+# (one encrypted copy per active license + latest.json). Friends' Companion downloads
+# from releases/latest. Uses this repo's own token: no personal token needed.
+name: Release incoming update
+
+on:
+  push:
+    branches: [incoming]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: incoming
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('latest.json'))['version'])")
+          [[ "$version" =~ ^[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]{4}$ ]] || { echo "Bad version: $version"; exit 1; }
+          gh release create "v$version" latest.json *.enc --repo "$GITHUB_REPOSITORY" --target incoming \
+            --title "Companion $version" --notes "Encrypted per-license copies. Companion downloads its own." --latest
